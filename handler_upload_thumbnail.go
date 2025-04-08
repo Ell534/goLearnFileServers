@@ -6,8 +6,6 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -47,7 +45,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	defer file.Close()
 
-	var fileExtension string
 	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "unable to parse media type from Content-Type header", err)
@@ -61,24 +58,19 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "missing Content-Type for thumbnail", nil)
 		return
 	}
-	fileTypeParts := strings.Split(mediaType, "/")
-	if len(fileTypeParts) == 2 {
-		fileExtension = "." + fileTypeParts[1]
-	}
 
-	fileName := videoIDString + fileExtension
-	filePath := filepath.Join(cfg.assetsRoot, fileName)
-	fmt.Println(filePath)
-	newFile, err := os.Create(filePath)
+	assetPath := getAssetPath(videoID, mediaType)
+	assetDiskPath := cfg.getAssetDiskPath(assetPath)
+
+	dst, err := os.Create(assetDiskPath)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "unable to create file", err)
+		respondWithError(w, http.StatusInternalServerError, "unable to create file on server", err)
 		return
 	}
-	defer newFile.Close()
 
-	_, err = io.Copy(newFile, file)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "unable to copy image data to new file", err)
+	defer dst.Close()
+	if _, err = io.Copy(dst, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error saving file", err)
 		return
 	}
 
@@ -92,7 +84,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	thumbnail_url := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, fileName)
+	thumbnail_url := cfg.getAssetURL(assetPath)
 
 	video.ThumbnailURL = &thumbnail_url
 
