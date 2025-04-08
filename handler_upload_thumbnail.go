@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,12 +48,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 
 	var fileExtension string
-	fileType := header.Header.Get("Content-Type")
-	if fileType == "" {
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to parse media type from Content-Type header", err)
+		return
+	}
+	if mediaType != "image/jpeg" && mediaType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "media type not jpeg or png in Content-Type header", nil)
+		return
+	}
+	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "missing Content-Type for thumbnail", nil)
 		return
 	}
-	fileTypeParts := strings.Split(fileType, "/")
+	fileTypeParts := strings.Split(mediaType, "/")
 	if len(fileTypeParts) == 2 {
 		fileExtension = "." + fileTypeParts[1]
 	}
