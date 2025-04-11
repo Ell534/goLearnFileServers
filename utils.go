@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os/exec"
 )
 
@@ -35,7 +36,21 @@ func getVideoAspectRatio(filePath string) (string, error) {
 		return "", fmt.Errorf("no streams found in video")
 	}
 
-	// width := output.Streams[0].Width
-	// height := output.Streams[0].Height
-	return "", nil
+	width := output.Streams[0].Width
+	height := output.Streams[0].Height
+	ratio := float64(width) / float64(height)
+
+	const (
+		ratio16by9 = 16.0 / 9.0
+		ratio9by16 = 9.0 / 16.0
+		tolerance  = 0.1
+	)
+
+	if math.Abs(ratio-ratio16by9) <= tolerance {
+		return "landscape", nil
+	} else if math.Abs(ratio-ratio9by16) <= tolerance {
+		return "portrait", nil
+	} else {
+		return "other", nil
+	}
 }
